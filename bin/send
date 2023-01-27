@@ -1,0 +1,49 @@
+#!/bin/sh
+
+import git:install/lib/file.sh
+import /lib/split.sh
+
+_send_file() {
+	_require_file "$_DATA_FILENAME"
+	_DATA_FILENAME=$(readlink -f $_DATA_FILENAME)
+
+	local temp_file=$(mktemp)
+	mv $temp_file $temp_file.$_CONF_TRANSFER_SUFFIX
+	temp_file=$temp_file.$_CONF_TRANSFER_SUFFIX
+
+	printf "filename=$_DATA_FILENAME" | qrencode -o $temp_file
+
+	_send_qr_code_data $temp_file
+
+	_send_file_data
+}
+
+_send_qr_code_data() {
+	_open $1
+	sleep 2
+
+	rm -f $1
+
+	_continue_if "Press enter when complete:" "Y/n"
+}
+
+_send_file_data() {
+	# send data
+	temp_dir=$(mktemp -d)
+	cd $temp_dir
+
+	$_CONF_TRANSFER_SPLIT_FUNCTION
+	for _FILE_SEGMENT in $(ls); do
+		qrencode -r $_FILE_SEGMENT -o $_FILE_SEGMENT.png
+
+		_send_qr_code_data $_FILE_SEGMENT.png
+	done
+}
+
+_ORIGINAL_PWD=$PWD
+
+for _DATA_FILENAME in "$@"; do
+	_send_file
+
+	cd $_ORIGINAL_PWD
+done
