@@ -1,0 +1,59 @@
+#!/bin/sh
+
+import git:install/file.sh
+import split.sh
+
+_send_file() {
+	_require_file "$_DATA_FILENAME"
+	_DATA_FILENAME=$(readlink -f $_DATA_FILENAME)
+
+	local file_size=$(wc -c <$_DATA_FILENAME | awk {'print$1'})
+	if [ $file_size -gt $_CONF_TRANSFER_MAX_DATA_SIZE ]; then
+		_error "$_DATA_FILENAME is too large to send [$file_size] > $_CONF_TRANSFER_MAX_DATA_SIZE"
+	fi
+
+	local temp_file=$(mktemp)
+	mv $temp_file $temp_file.$_CONF_TRANSFER_SUFFIX
+	temp_file=$temp_file.$_CONF_TRANSFER_SUFFIX
+
+	printf "filename=$_DATA_FILENAME" | qrencode -o $temp_file
+
+	_send_qr_code_data $temp_file
+
+	_send_file_data
+}
+
+_send_qr_code_data() {
+	_open $1
+	sleep 2
+
+	rm -f $1
+
+	_continue_if "Press enter when complete:" "Y/n"
+}
+
+_send_file_data() {
+	temp_dir=$(mktemp -d)
+	_defer _send_cleanup
+
+	cd $temp_dir
+
+	$_CONF_TRANSFER_SPLIT_FUNCTION
+	for _FILE_SEGMENT in $(ls); do
+		qrencode -r $_FILE_SEGMENT -o $_FILE_SEGMENT.png
+
+		_send_qr_code_data $_FILE_SEGMENT.png
+	done
+}
+
+_send_cleanup() {
+	rm -rf $temp_dir
+}
+
+_ORIGINAL_PWD=$PWD
+
+for _DATA_FILENAME in "$@"; do
+	_send_file
+
+	cd $_ORIGINAL_PWD
+done
