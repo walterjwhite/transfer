@@ -1,0 +1,13 @@
+#!/bin/sh
+
+import git:install/file.sh
+import split.sh
+import qr.sh
+
+_ORIGINAL_PWD=$PWD
+
+for _DATA_FILENAME in "$@"; do
+	_send_file
+
+	cd $_ORIGINAL_PWD
+done
